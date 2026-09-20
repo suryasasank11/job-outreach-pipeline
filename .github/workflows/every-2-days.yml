@@ -1,0 +1,57 @@
+name: application-tracker
+
+on:
+  schedule:
+    # 08:00 UTC every other day. The 3-day Gmail query window absorbs the slight
+    # unevenness of '*/2' at month boundaries.
+    - cron: "0 8 */2 * *"
+  workflow_dispatch: {}      # manual "Run workflow" button in the Actions tab
+
+permissions:
+  contents: write            # commit updated state back to the repo
+  pages: write               # publish the dashboard to GitHub Pages
+  id-token: write            # required by the Pages deploy action
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  track:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install deps
+        run: pip install -r requirements.txt
+
+      - name: Run 2-day tracker (fetch, classify, render dashboard)
+        env:
+          GMAIL_CLIENT_ID: ${{ secrets.GMAIL_CLIENT_ID }}
+          GMAIL_CLIENT_SECRET: ${{ secrets.GMAIL_CLIENT_SECRET }}
+          GMAIL_REFRESH_TOKEN: ${{ secrets.GMAIL_REFRESH_TOKEN }}
+        run: python3 src/daily.py
+
+      - name: Commit updated tracker state
+        run: |
+          git config user.name  "tracker-bot"
+          git config user.email "tracker-bot@users.noreply.github.com"
+          git add data/state.json data/applications.csv
+          git commit -m "tracker: $(date -u +%Y-%m-%d) run" || echo "no changes"
+          git push || echo "nothing to push"
+
+      - name: Upload dashboard for Pages
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+
+      - name: Deploy to GitHub Pages
+        id: deploy
+        uses: actions/deploy-pages@v4
