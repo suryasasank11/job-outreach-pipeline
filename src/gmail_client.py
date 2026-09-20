@@ -25,7 +25,7 @@ SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"]
 QUERY = (
     '("application received" OR "thank you for applying" OR "application submitted" '
     'OR "received your application" OR "we received your" OR "applying to") '
-    "newer_than:3d"      # 3-day window for a 2-day cadence = 1-day safety overlap
+    "newer_than:90d"      # 3-day window for a 2-day cadence = 1-day safety overlap
 )
 
 
